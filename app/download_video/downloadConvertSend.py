@@ -16,7 +16,7 @@ def download(video_url):
         'outtmpl': os.path.join(downloaded_dir, '%(title)s.%(ext)s'),
         'postprocessors': [{  # Постобработка для преобразования в MP3
             'key': 'FFmpegExtractAudio',  # Использовать FFmpeg для извлечения аудио
-            'preferredcodec': 'wav',  # Выбрать формат MP3
+            'preferredcodec': 'mp3',  # Выбрать формат MP3
             'preferredquality': '192',  # Качество аудио (192 kbps)
         }],
         'extract_audio': True,  # Извлечь аудио
