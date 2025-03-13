@@ -1,37 +1,59 @@
 from aiogram import F, Router
+import os
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery, InputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
-from aiogram.filters.state import State, StatesGroup
 from app.download_video import downloadConvertSend as dac
-from app.download_video.downloadConvertSend import PATH, file_name
-
+from app.download_video.downloadConvertSend import PATH
+from app.handlers.buttonOk import keyboardForOk
 
 router = Router()
-
-
-class TranslationStates(StatesGroup):
-    nameOfVideo = State()
+status_message = None
+Path = ""
 
 
 @router.message(CommandStart())
 async def startCmd(message: Message):
-    await message.answer(f"Привет. Вас приветствует бот-переводчик. Напишите мне для перевода")
+    await message.answer(f"Привет. Вас приветствует Бот для скачивания видео с Youtube в аудио формате. Отправь мне ссылку чтобы проверить")
 
 
 @router.message()
 async def donwloadAndSend(message: Message, state: FSMContext):
+    if (message.text.startswith("https://")):
+        try:
+            global status_message
+            status_message = await message.answer("Началось скачивание...")
 
-    await state.update_data(text=message.text)
-    await state.set_state(TranslationStates.nameOfVideo)
-    if message.text.startswith("https://youtu"):
-        Path = PATH + "\\" + dac.download(message.text)
-        filename = dac.download(message.text)
-        await message.answer(f"Аудио {filename} успешно скачано в формате MP3!")
-        with open(filename, 'rb') as file:
-            audio = InputFile(file)
+            filename = dac.download(message.text)
+            if not filename:
+                await message.answer("Не удалось скачать аудиофайл. Проверьте ссылку.")
+                return
 
-        # audio = open(f'{PATH}\\{filename}', 'rb')
-        await message.answer_audio(audio=audio)
+            if not os.path.exists(PATH):
+                os.makedirs(PATH)
+            global Path
+            Path = os.path.join(PATH, filename)
+            await status_message.edit_text(f"Аудио {filename} успешно скачано")
+            try:
+                audio = FSInputFile(Path)
+                sent_message = await message.answer_audio(audio, reply_markup=keyboardForOk)
+                global message_id
+                message_id = sent_message.message_id
+            except FileNotFoundError:
+                await message.answer("Файл не найден.")
+            except Exception as e:
+                await message.answer(f"Произошла ошибка при отправке аудио: {e}")
+
+        except Exception as e:
+            await message.answer(f"Произошла ошибка при скачивании: {e}")
     else:
-        await message.answer("Неправильная ссылка")
+        await message.answer("Не правильная ссылка")
+
+
+@router.callback_query(F.data == "OK")
+async def deleting(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    os.remove(Path)
+    await status_message.delete()
+    await callback.answer('Файл удален!')
+    await callback.answer()
